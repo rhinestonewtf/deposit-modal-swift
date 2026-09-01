@@ -1,0 +1,33 @@
+name: Conformance freshness
+
+# Whether the PAGE has moved, which is a property of time rather than of a pull
+# request — so it runs on a schedule instead of gating every PR. The PR gate is
+# the offline replay in `swift test`, which is deterministic and needs no
+# network.
+#
+# A failure here means this wrapper declares a name the page no longer speaks.
+# Additions are ignored: the contract's discipline is that new fields are
+# optional and a receiver ignores what it does not know, so reddening CI for one
+# would train people to re-vendor without reading.
+
+on:
+  schedule:
+    - cron: "23 6 * * *"
+  workflow_dispatch:
+    inputs:
+      origin:
+        description: "Embed origin to check against"
+        required: false
+        default: "https://dev.deposit.rhinestone.dev"
+
+jobs:
+  freshness:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      # Dev tracks `main` in `deposit-modal`, so a contract change lands here
+      # first. Prod moves once per release.
+      - name: Check the vendored transcript against the page
+        env:
+          RHINESTONE_EMBED_ORIGIN: ${{ inputs.origin || 'https://dev.deposit.rhinestone.dev' }}
+        run: swift test --filter FreshnessTests

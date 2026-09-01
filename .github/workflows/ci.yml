@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    # The bridge core is free of WebKit, so the contract and the conformance
+    # replay run here without a simulator.
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift build
+      - run: swift test
+
+  ios:
+    # `swift build` does not compile `DepositSheetController` or the SwiftUI
+    # presenter — both are behind `#if os(iOS)` — so a macOS build proves
+    # nothing about the half an integrator actually presents.
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build for iOS
+        run: |
+          xcodebuild -scheme RhinestoneDepositModal \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath .build/xcode \
+            build
+
+  example:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - run: brew install xcodegen
+      - name: Build the example app
+        working-directory: Example
+        run: |
+          xcodegen generate
+          xcodebuild -project DepositModalExample.xcodeproj \
+            -scheme DepositModalExample \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath .build \
+            build
