@@ -61,10 +61,20 @@ re-declare the same thing anyway.
   its own `UIViewControllerRepresentable` host: that one is a zero-size
   background view and is not in a window on the first update, so `present` is a
   silent no-op that reads as the page failing to load.
-- **`swift build` does not compile the iOS half.** `DepositSheetController` and
-  `DepositSheet` are behind `#if os(iOS)`, so a macOS build proves nothing about
-  them. Build with
-  `xcodebuild -scheme RhinestoneDepositModal -destination 'generic/platform=iOS Simulator'`.
+- **`swift test` does not run the iOS half.** `DepositSheetController`, the
+  SwiftUI presenter and their tests are behind `#if os(iOS)`, so a macOS run
+  proves nothing about them —
+  `xcodebuild test -scheme RhinestoneDepositModal -destination 'platform=iOS Simulator,name=<device>'`
+  is what runs everything. Both are in CI, and the counts differ on purpose.
+- **`DepositSheetController.postedFrames` and `receiveForTesting` are the seam
+  the controller tests drive**, and they are `internal` rather than a hack
+  because `WKScriptMessage` has no public initializer — nor do its `frameInfo`
+  and `securityOrigin` — so the alternative tests a stub of the message handler
+  instead of the controller.
+- **A field the page declares `T | null` must be encoded even when nil.** Swift
+  omits a nil optional, so the page reads `undefined` where the contract says
+  `null` — `WalletState.chainId` writes its own `encode(to:)` for that reason,
+  while `icon` and `name` are genuinely optional and are omitted.
 - **`-Xswiftc -sdk` does not cross-compile this package**; SwiftPM keeps the
   macOS sysroot for the module step and the build dies in `CoreServices`. Use
   `xcodebuild`.

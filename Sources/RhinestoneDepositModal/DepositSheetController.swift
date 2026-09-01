@@ -243,9 +243,30 @@
             ])
         }
 
+        /**
+         The seam the tests drive this through, in place of a page.
+
+         `internal`, so it is not API. The alternative is fabricating a
+         `WKScriptMessage` — which has no public initializer, and whose
+         `frameInfo` and `securityOrigin` have none either — so a test would end
+         up driving a stub of the message handler rather than the controller
+         that three of this file's bugs lived in.
+         */
+        var postedFrames: ((String) -> Void)?
+
+        /// Feed a frame as the page would, past the frame and origin checks
+        /// that a web view performs.
+        func receiveForTesting(_ envelope: Envelope) {
+            guard let data = try? JSONEncoder().encode(envelope),
+                let json = String(data: data, encoding: .utf8)
+            else { return }
+            host.receive("\(nonce)\(Injection.nonceSeparator)\(json)")
+        }
+
         private func buildHost() {
             host = BridgeHost(
                 post: { [weak self] script in
+                    self?.postedFrames?(script)
                     self?.webView.evaluateJavaScript(script, completionHandler: nil)
                 },
                 nonce: nonce,

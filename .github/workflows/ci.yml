@@ -16,18 +16,18 @@ jobs:
       - run: swift test
 
   ios:
-    # `swift build` does not compile `DepositSheetController` or the SwiftUI
-    # presenter — both are behind `#if os(iOS)` — so a macOS build proves
-    # nothing about the half an integrator actually presents.
+    # `swift test` runs on macOS, where `DepositSheetController`, the SwiftUI
+    # presenter and their tests do not exist — all behind `#if os(iOS)`. Three
+    # of this package's first six defects lived in exactly that half, so a
+    # macOS-only suite is the coverage gap, not a convenience.
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-      - name: Build for iOS
+      - name: Test on a simulator
         run: |
-          xcodebuild -scheme RhinestoneDepositModal \
-            -destination 'generic/platform=iOS Simulator' \
-            -derivedDataPath .build/xcode \
-            build
+          xcodebuild test -scheme RhinestoneDepositModal \
+            -destination 'platform=iOS Simulator,name=iPhone 16 Pro' \
+            -derivedDataPath .build/xcode
 
   example:
     runs-on: macos-15

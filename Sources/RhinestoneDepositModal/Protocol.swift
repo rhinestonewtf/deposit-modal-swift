@@ -609,6 +609,31 @@ public struct WalletState: Codable, Equatable, Sendable {
         accounts: [],
         chainId: nil
     )
+
+    /**
+     `chainId` is written even when it is `nil`, because the contract declares
+     it `string | null` — required and nullable — where `icon` and `name` are
+     genuinely optional.
+
+     Swift's encoder omits a `nil` optional, so the default synthesis would drop
+     the key entirely and a disconnected wallet would reach the page as
+     `undefined` rather than `null`. The two are interchangeable to most of the
+     page's reads today, which is exactly why this would rot unnoticed until one
+     of them was not.
+     */
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(isReady, forKey: .isReady)
+        try container.encode(isConnected, forKey: .isConnected)
+        try container.encode(accounts, forKey: .accounts)
+        try container.encode(chainId, forKey: .chainId)
+        try container.encodeIfPresent(icon, forKey: .icon)
+        try container.encodeIfPresent(name, forKey: .name)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case isReady, isConnected, accounts, chainId, icon, name
+    }
 }
 
 /// CAIP-27 shaped, so native wallet SDKs forward rather than translate.
