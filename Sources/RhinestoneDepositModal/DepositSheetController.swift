@@ -135,6 +135,7 @@
         /// the lock lifts.
         private var dismissWhenUnlocked = false
         private var hasDismissed = false
+        private var hasClosedSession = false
         private let spinner = UIActivityIndicatorView(style: .medium)
 
         public init(
@@ -469,20 +470,44 @@
         }
 
         /**
+         Stops the session without dismissing anything and without calling back.
+
+         A host that takes the sheet down its own way — a SwiftUI binding set to
+         `false`, a `dismiss(animated:)` of its own — gets no delegate callback
+         from UIKit, which reserves those for a user-driven dismissal. Without
+         this the watcher keeps polling and the bridge stays open behind a sheet
+         that is already gone, and `onDepositSettled` fires for a deposit nobody
+         is watching for any more.
+
+         Idempotent, and safe to call before dismissing.
+         */
+        public func closeSession() {
+            guard !hasClosedSession else { return }
+            hasClosedSession = true
+            dismissWhenUnlocked = false
+            watch?.stop()
+            host.close()
+        }
+
+        /**
          Once per sheet, whichever route gets here first.
 
-         The page asking to close and the user swiping are two routes to the
-         same end, and the first can produce the second: `onDismiss` is how the
-         presenter takes the sheet down, and a presenter that dismisses
-         interactively then reports it back. Without the latch an integrator's
-         teardown — and their analytics — run twice for one close.
+         **The sheet takes itself down.** `onDismiss` is optional and a UIKit
+         integrator may present this with none, so a page that closed its own
+         flow would otherwise leave a sheet on screen with a dead channel behind
+         it — nothing left to answer the user's next tap.
+
+         Latched because the page asking to close and the user swiping are two
+         routes to one end, and the first produces the second: `onDismiss` is
+         how a presenter takes the sheet down, and a presenter that dismisses
+         interactively then reports it back. Without it an integrator's teardown
+         and their analytics run twice for one close.
          */
         private func dismissNow() {
             guard !hasDismissed else { return }
             hasDismissed = true
-            dismissWhenUnlocked = false
-            watch?.stop()
-            host.close()
+            closeSession()
+            if presentingViewController != nil { dismiss(animated: true) }
             callbacks.onDismiss?()
         }
 

@@ -76,6 +76,11 @@
                 if isPresented, sheet == nil {
                     present(from: presenter)
                 } else if !isPresented, let sheet {
+                    // UIKit reserves its dismissal callbacks for a user-driven
+                    // dismissal, so taking the sheet down from the binding
+                    // reaches nothing on the controller: the session has to be
+                    // closed by hand or the watcher outlives the sheet.
+                    sheet.closeSession()
                     sheet.dismiss(animated: true)
                     self.sheet = nil
                 } else if let sheet {
