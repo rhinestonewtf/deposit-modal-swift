@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    # The bridge core is free of WebKit, so the contract and the conformance
+    # replay run here without a simulator.
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift build
+      - run: swift test
+
+  ios:
+    # `swift test` runs on macOS, where `DepositSheetController`, the SwiftUI
+    # presenter and their tests do not exist — all behind `#if os(iOS)`. Three
+    # of this package's first six defects lived in exactly that half, so a
+    # macOS-only suite is the coverage gap, not a convenience.
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test on a simulator
+        run: |
+          xcodebuild test -scheme RhinestoneDepositModal \
+            -destination 'platform=iOS Simulator,name=iPhone 16 Pro' \
+            -derivedDataPath .build/xcode
+
+  example:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - run: brew install xcodegen
+      - name: Build the example app
+        working-directory: Example
+        run: |
+          xcodegen generate
+          xcodebuild -project DepositModalExample.xcodeproj \
+            -scheme DepositModalExample \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath .build \
+            build

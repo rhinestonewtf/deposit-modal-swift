@@ -1,0 +1,33 @@
+name: DepositModalExample
+
+options:
+  bundleIdPrefix: dev.rhinestone
+  deploymentTarget:
+    # 16, not the package's 15: the content-height detent needs
+    # `UISheetPresentationController.Detent.custom`, and an example that cannot
+    # show the sheet sizing itself is not showing the feature.
+    iOS: "16.0"
+  createIntermediateGroups: true
+
+packages:
+  RhinestoneDepositModal:
+    path: ..
+
+targets:
+  DepositModalExample:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+    dependencies:
+      - package: RhinestoneDepositModal
+        product: RhinestoneDepositModal
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        PRODUCT_BUNDLE_IDENTIFIER: dev.rhinestone.depositmodal.example
+        TARGETED_DEVICE_FAMILY: "1"
+        SWIFT_VERSION: "5.9"
