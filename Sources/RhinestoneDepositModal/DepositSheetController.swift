@@ -128,6 +128,9 @@
         private var handshakeTimer: Task<Void, Never>?
         private var hasReloaded = false
         private var settled = false
+        /// The page's own version, learned at hello. Also what says there is a
+        /// session to poll alongside.
+        private var modalVersion: String?
         /// A dismissal the page asked for while it was locked, honoured when
         /// the lock lifts.
         private var dismissWhenUnlocked = false
@@ -291,6 +294,7 @@
         private func handleHello(_ params: HelloParams) {
             settled = true
             handshakeTimer?.cancel()
+            modalVersion = params.modalVersion
             startWatch(modalVersion: params.modalVersion)
         }
 
@@ -339,13 +343,34 @@
         /// sheet is open, and the page repaints in place without disturbing the
         /// flow.
         public func update(config: EmbedConfig) {
+            let moved = SessionUpdate.corridorMoved(from: self.config, to: config)
             self.config = config
             if host.connected { host.configure(config) }
+            /**
+             The watch follows the config rather than the one it was born with.
+
+             An app that switches account behind a live sheet would otherwise
+             leave the page starting deposits for one address while the watcher
+             polled another — and the completion the web view died through is
+             then missed by the only thing still looking for it. Restarting
+             takes a fresh baseline, which is right: what was already finished
+             for a different account is not this account's news.
+             */
+            if moved, let modalVersion { startWatch(modalVersion: modalVersion) }
         }
 
+        /**
+         `nil` is a disconnect, and it has to be SAID.
+
+         Capabilities are settled once at hello, but wallet availability rides
+         `wallet.state` — so a host that drops its wallet and pushes nothing
+         leaves the page rendering the old connected account, and the next
+         wallet action answers 4200 instead of the page falling back to the
+         funding paths that need no wallet.
+         */
         public func update(wallet: WalletBridge?) {
             self.wallet = wallet
-            if let wallet, host.connected { host.pushWalletState(wallet.state) }
+            if host.connected { host.pushWalletState(wallet?.state ?? .none) }
         }
 
         // MARK: - Events
