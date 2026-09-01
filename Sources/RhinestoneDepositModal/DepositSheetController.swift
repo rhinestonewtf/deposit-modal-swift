@@ -184,6 +184,21 @@
             observeForeground()
         }
 
+        /**
+         The dismissal delegate is owned here, not by whoever presents.
+
+         A UIKit integrator presenting this directly would otherwise get a swipe
+         that dismisses the sheet without closing anything: the watch keeps
+         polling, the bridge stays open, and `onDismiss` never fires — so the
+         app never learns the sheet is gone. Observe dismissal through
+         `callbacks.onDismiss` rather than by replacing this; a delegate set from
+         outside takes the wiring with it.
+         */
+        public override func viewWillAppear(_ animated: Bool) {
+            super.viewWillAppear(animated)
+            presentationController?.delegate = self
+        }
+
         private func buildWebView() {
             let configuration = WKWebViewConfiguration()
             configuration.allowsInlineMediaPlayback = true

@@ -111,7 +111,9 @@
                     sheet.detents = [.large()]
                     sheet.prefersGrabberVisible = true
                 }
-                controller.presentationController?.delegate = controller
+                // The controller installs its own dismissal delegate, so a
+                // UIKit integrator presenting it directly gets the same
+                // behaviour this modifier does.
                 sheet = controller
 
                 // Presented from whatever is actually on screen, not from the
