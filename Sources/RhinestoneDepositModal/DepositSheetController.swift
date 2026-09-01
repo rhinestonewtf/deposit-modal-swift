@@ -124,6 +124,9 @@
         private var webView: WKWebView!
         private var host: BridgeHost!
         private var watch: DepositWatch?
+        /// The config the running watch was started for, so a re-handshake can
+        /// tell "the same session reloaded" from "the app switched account".
+        private var watchedConfig: EmbedConfig?
         private let nonce = Injection.makeSessionNonce()
         private var handshakeTimer: Task<Void, Never>?
         private var hasReloaded = false
@@ -340,8 +343,22 @@
          The watch cannot start before hello: its requests carry the same
          version header the page's do, so the pair is one client at the
          processor rather than two, and only the page can name its half.
+
+         **A second hello is not a second watch.** The page reloads — after the
+         injection race, or because the OS killed it — and each reload
+         handshakes again. Restarting here would take a fresh baseline, and a
+         baseline suppresses everything already terminal as history: precisely
+         the deposit that settled while the page was dead, which is the one case
+         this watcher exists for. It restarts only when the corridor moves,
+         which is a different session by definition.
          */
         private func startWatch(modalVersion: String) {
+            if watch != nil, let watchedConfig,
+                !SessionUpdate.corridorMoved(from: watchedConfig, to: config)
+            {
+                return
+            }
+            watchedConfig = config
             watch?.stop()
             guard !config.recipient.isEmpty else { return }
             let watch = DepositWatch(
@@ -605,7 +622,8 @@
             // A page that navigated away is not our page, and the injected
             // script would have run there too.
             let origin = message.frameInfo.securityOrigin
-            let sender = "\(origin.protocol)://\(origin.host)"
+            guard origin.protocol.lowercased() == "https" else { return }
+            let sender = Origin.origin(host: origin.host, port: origin.port)
             guard Origin.isSameOrigin(sender, as: embedURL) else { return }
             host.receive(message.body)
         }

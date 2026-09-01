@@ -48,6 +48,20 @@ public enum Origin {
         return authority
     }
 
+    /**
+     Rebuild an origin from the parts a web view reports about a frame.
+
+     The port is separate there and easy to drop, and dropping it is not a
+     cosmetic loss: an embed origin like `https://localhost:3000` — a wrapper
+     pointed at a page served locally — passes the navigation gate, loads, and
+     then has every one of its bridge messages rejected as foreign, so it never
+     handshakes at all. `0` is "the scheme's default", which is what a web view
+     reports for 443.
+     */
+    public static func origin(host: String, port: Int) -> String {
+        port == 0 || port == 443 ? "https://\(host)" : "https://\(host):\(port)"
+    }
+
     public static func isSameOrigin(_ url: String, as origin: String) -> Bool {
         guard let target = httpsAuthority(of: url),
             let expected = httpsAuthority(of: origin)

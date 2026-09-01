@@ -23,6 +23,31 @@ final class OriginTests: XCTestCase {
         XCTAssertFalse(Origin.isSameOrigin("https://evil.example/deposit.rhinestone.dev", as: embed))
     }
 
+    /**
+     A web view reports a frame's origin in parts, and the port is the one that
+     is easy to drop. Dropping it costs a wrapper pointed at a page served
+     locally every bridge message: the navigation gate passes, the page loads,
+     and nothing it says is ever accepted.
+     */
+    func testRebuildsAnOriginFromTheePartsAWebViewReports() {
+        XCTAssertEqual(Origin.origin(host: "deposit.rhinestone.dev", port: 0), embed)
+        XCTAssertEqual(Origin.origin(host: "deposit.rhinestone.dev", port: 443), embed)
+        XCTAssertEqual(Origin.origin(host: "localhost", port: 3000), "https://localhost:3000")
+
+        XCTAssertTrue(
+            Origin.isSameOrigin(
+                Origin.origin(host: "localhost", port: 3000),
+                as: "https://localhost:3000"
+            )
+        )
+        XCTAssertFalse(
+            Origin.isSameOrigin(
+                Origin.origin(host: "localhost", port: 3001),
+                as: "https://localhost:3000"
+            )
+        )
+    }
+
     func testRefusesAnythingThatIsNotHTTPS() {
         XCTAssertNil(Origin.httpsAuthority(of: "http://deposit.rhinestone.dev"))
         XCTAssertNil(Origin.httpsAuthority(of: "javascript:alert(1)"))

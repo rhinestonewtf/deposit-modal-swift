@@ -113,6 +113,74 @@
             posted = []
             dismissals = 0
             settled = []
+            StubProtocol.reset()
+            // The controller builds its own `DepositWatch` on `URLSession.shared`,
+            // so the only way to answer it is to register globally.
+            URLProtocol.registerClass(StubProtocol.self)
+        }
+
+        override func tearDown() {
+            URLProtocol.unregisterClass(StubProtocol.self)
+            super.tearDown()
+        }
+
+        /**
+         The page reloads — after the injection race, or because the OS killed
+         it — and each reload handshakes again. A watch restarted there takes a
+         fresh baseline, and a baseline suppresses everything already terminal
+         as history: precisely the deposit that settled while the page was dead,
+         which is the one case this watcher exists for.
+         */
+        func testAReloadDoesNotResetTheDepositBaseline() async {
+            let controller = DepositSheetController(
+                config: Self.config(),
+                callbacks: DepositSheetCallbacks(
+                    onDepositSettled: { [weak self] deposit in self?.settled.append(deposit) },
+                    onFatal: { _ in }
+                ),
+                embedURL: "https://deposit.example.invalid",
+                pollInterval: 0.05
+            )
+            controller.postedFrames = { [weak self] script in
+                guard let envelope = RecordingHost.decodeFrame(fromScript: script) else { return }
+                self?.posted.append(envelope)
+            }
+            controller.loadViewIfNeeded()
+
+            // Nothing outstanding when the sheet opened.
+            await handshake(controller)
+            await settleRequests()
+
+            // The deposit completes while the page is dead.
+            StubProtocol.reply.body = #"""
+                {"deposits":[{"txHash":"0xdead","status":"completed"}]}
+                """#
+
+            // The page comes back and says hello again.
+            controller.receiveForTesting(
+                .request(
+                    id: "hello.2",
+                    method: BridgeMethod.hello.rawValue,
+                    params: .object([
+                        "protocol": .number(2), "modalVersion": .string("0.0.0-test"),
+                    ])
+                )
+            )
+            await settleRequests()
+
+            XCTAssertEqual(
+                settled.map(\.txHash),
+                ["0xdead"],
+                "the reload took a fresh baseline and swallowed the settlement"
+            )
+            controller.closeSession()
+        }
+
+        /// Long enough for a couple of poll intervals to come round.
+        private func settleRequests() async {
+            for _ in 0..<40 {
+                try? await Task.sleep(nanoseconds: 10_000_000)
+            }
         }
 
         // MARK: - The lock
