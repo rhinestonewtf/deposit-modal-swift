@@ -83,8 +83,11 @@ public final class DepositWatch {
      */
     private var startedAt = ""
     private var ticker: Task<Void, Never>?
-    private var inFlight: Task<Void, Never>?
+    private var inFlight: Task<(Data, URLResponse), Error>?
     private var running = false
+    /// Terminal, unlike `running`: a watch that was stopped never delivers
+    /// again, however late an answer arrives.
+    private var stopped = false
 
     public init(
         backendURL: String,
@@ -120,8 +123,19 @@ public final class DepositWatch {
         }
     }
 
+    /**
+     Stops for good.
+
+     A watch is stopped when the sheet closes or when the corridor moves, and
+     both are cases where a late answer is worse than no answer: it would report
+     a settlement after dismissal, or one belonging to the recipient the app
+     just switched away from. So cancelling the request is not enough on its own
+     — a response already decoded, or one that races the cancel, is refused at
+     delivery too.
+     */
     public func stop() {
         running = false
+        stopped = true
         ticker?.cancel()
         ticker = nil
         inFlight?.cancel()
@@ -136,6 +150,7 @@ public final class DepositWatch {
      arrives as a scene-activation notice rather than as a tick.
      */
     public func poll() async {
+        guard !stopped else { return }
         if startedAt.isEmpty { startedAt = Self.now() }
         // The poll that takes the baseline must be allowed to finish.
         // Cancelling it hands the baseline to a later response, and every
@@ -162,8 +177,17 @@ public final class DepositWatch {
         request.httpMethod = "GET"
         request.setValue(versionHeader, forHTTPHeaderField: WrapperVersion.header)
 
+        // Held so `stop()` and the next poll can actually cancel it. Awaiting
+        // `session.data` directly leaves the request untracked, which reads as
+        // cancellation everywhere in this file while cancelling nothing.
+        let work = Task { try await session.data(for: request) }
+        inFlight = work
+        defer { if inFlight == work { inFlight = nil } }
+
         do {
-            let (data, response) = try await session.data(for: request)
+            let (data, response) = try await work.value
+            // The answer outlived the reason for asking.
+            guard !stopped else { return }
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
             guard (200..<300).contains(status) else {
                 if !baselineTaken { baselineDegraded = true }
@@ -173,7 +197,10 @@ public final class DepositWatch {
             let deposits = (try JSONDecoder().decode(Response.self, from: data).deposits) ?? []
             absorb(deposits)
         } catch {
-            if Task.isCancelled { return }
+            // A cancelled poll is not a failed one: it was superseded, or the
+            // sheet closed. Reporting it would turn every dismissal into an
+            // error the integrator sees.
+            if work.isCancelled || Task.isCancelled || stopped { return }
             if !baselineTaken { baselineDegraded = true }
             onError?(error)
         }

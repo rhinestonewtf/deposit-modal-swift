@@ -134,6 +134,7 @@
         /// A dismissal the page asked for while it was locked, honoured when
         /// the lock lifts.
         private var dismissWhenUnlocked = false
+        private var hasDismissed = false
         private let spinner = UIActivityIndicatorView(style: .medium)
 
         public init(
@@ -467,7 +468,18 @@
             }
         }
 
+        /**
+         Once per sheet, whichever route gets here first.
+
+         The page asking to close and the user swiping are two routes to the
+         same end, and the first can produce the second: `onDismiss` is how the
+         presenter takes the sheet down, and a presenter that dismisses
+         interactively then reports it back. Without the latch an integrator's
+         teardown — and their analytics — run twice for one close.
+         */
         private func dismissNow() {
+            guard !hasDismissed else { return }
+            hasDismissed = true
             dismissWhenUnlocked = false
             watch?.stop()
             host.close()
