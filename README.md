@@ -88,10 +88,19 @@ The browser hand-off is always available: the card and exchange rows open in
 cd Example && xcodegen generate && open DepositModalExample.xcodeproj
 ```
 
-Set `RHINESTONE_BACKEND_URL` and `RHINESTONE_RECIPIENT` in the scheme's
-environment. Its wallet reports an account and **refuses to sign** — signing an
-EVM transaction needs secp256k1, which this package does not depend on and an
-example should not smuggle in. Wire your own signer to complete a deposit.
+Set `RHINESTONE_BACKEND_URL` in the scheme's environment, and
+`RHINESTONE_DEMO_PRIVATE_KEY` to a throwaway key — the wallet really signs, and
+the deposit lands in its own address unless `RHINESTONE_RECIPIENT` says
+otherwise. Without a key there is no wallet and the page offers QR and manual
+transfer, which is a real configuration rather than a degraded one.
+
+`RHINESTONE_CHAIN` is where the key holds funds and `RHINESTONE_TARGET_CHAIN`
+where the deposit lands; they are separate, and pointing only the target at a
+testnet leaves the wallet refusing every request as off-chain.
+
+That signing is `web3.swift`, which is the **example's** dependency and not the
+package's — the shape a real integration is in, where `request` goes to whatever
+wallet SDK the app already has.
 
 ## Requirements
 

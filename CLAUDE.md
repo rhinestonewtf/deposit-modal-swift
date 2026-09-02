@@ -78,10 +78,19 @@ re-declare the same thing anyway.
 - **`-Xswiftc -sdk` does not cross-compile this package**; SwiftPM keeps the
   macOS sysroot for the module step and the build dies in `CoreServices`. Use
   `xcodebuild`.
-- **The example refuses to sign, deliberately.** A real signature needs
-  secp256k1, which the package does not depend on. It answers EIP-1193 4001 —
-  the same code a user rejecting in a real wallet produces — so the page takes
-  the production path.
+- **The example signs for real, through `web3.swift` — an Example-target
+  dependency that must never reach `Package.swift`.** It drags SwiftNIO in
+  transitively, so the package staying dependency-free is what keeps that off
+  every integrator. A generic EIP-712 implementation is not optional there: the
+  deposit flow signs a Permit2/ERC-2612 authorization whose struct is
+  backend-owned, so only `host.signRecovery`'s is fixed and compiled in.
+- **web3.swift signs type-0 transactions only** and fills nonce and chain id but
+  not fees, so the demo wallet fetches `eth_gasPrice` and `eth_estimateGas`
+  itself. Base accepts legacy transactions; an EIP-1559 wallet differs only in
+  what it pays.
+- **No `RHINESTONE_DEMO_PRIVATE_KEY` means no wallet at all**, not a wallet that
+  refuses — the page then renders QR and manual transfer rather than a wallet
+  row that fails when tapped, which is what CI builds.
 - **Driving the simulator:** `RHINESTONE_AUTO_OPEN=1` presents the sheet on
   launch, so a run needs no tap driver. Pass environment through
   `SIMCTL_CHILD_*`, and screenshot with `xcrun simctl io booted screenshot`.

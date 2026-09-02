@@ -12,6 +12,12 @@ options:
 packages:
   RhinestoneDepositModal:
     path: ..
+  # The EXAMPLE's dependency, never the package's. A real integration hands
+  # `request` to whatever wallet SDK it already has; this app has none, so it
+  # brings one rather than pretending signing is free.
+  web3.swift:
+    url: https://github.com/argentlabs/web3.swift
+    from: 2.0.0
 
 targets:
   DepositModalExample:
@@ -22,6 +28,8 @@ targets:
     dependencies:
       - package: RhinestoneDepositModal
         product: RhinestoneDepositModal
+      - package: web3.swift
+        product: web3.swift
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
