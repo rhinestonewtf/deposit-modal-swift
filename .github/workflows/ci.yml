@@ -4,8 +4,33 @@ on:
   pull_request:
   push:
     branches: [main]
+    tags: ["v*"]
 
 jobs:
+  tag:
+    # A tag IS the release here — SPM resolves the repository and puts nothing
+    # of its own in the build — so the only thing standing between a `v0.2.0`
+    # tag and a package that reports `0.1.0` in the header the processor
+    # attributes an integration by is this check.
+    #
+    # It runs after the tag is pushed, which cannot prevent a wrong one; a tag
+    # is movable until someone depends on it, so failing loudly is the whole
+    # remedy available.
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: The tag and WrapperVersion.current must agree
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          declared=$(sed -n 's/.*current = "\(.*\)".*/\1/p' \
+            Sources/RhinestoneDepositModal/Version.swift)
+          if [ "$tag" != "$declared" ]; then
+            echo "Tag $GITHUB_REF_NAME ships WrapperVersion.current=$declared"
+            exit 1
+          fi
+          echo "$GITHUB_REF_NAME matches WrapperVersion.current"
+
   test:
     # The bridge core is free of WebKit, so the contract and the conformance
     # replay run here without a simulator.
